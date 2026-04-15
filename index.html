@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCFHS Nursing Simulator | Critical Care & Emergency Nursing | Level 4</title>
+    <style>
+        :root {
+            --primary: #1a2a6c;
+            --secondary: #b21f1f;
+            --accent: #fdbb2d;
+            --bg: #f8f9fa;
+            --text: #333;
+            --success: #28a745;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            color: var(--text);
+        }
+
+        .screen { display: none; padding: 20px; max-width: 900px; margin: auto; }
+        .active { display: block; }
+
+        .welcome-card, .result-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-top: 50px;
+        }
+
+        input[type="text"] {
+            padding: 12px;
+            width: 80%;
+            margin: 20px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .exam-header {
+            background: var(--primary);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-top: 20px;
+        }
+
+        .vignette {
+            font-size: 1.15rem;
+            font-weight: 600;
+            line-height: 1.6;
+            margin-bottom: 25px;
+            border-left: 5px solid var(--secondary);
+            padding-left: 15px;
+        }
+
+        .options-grid { display: grid; gap: 12px; }
+
+        .opt {
+            padding: 15px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #fff;
+            font-weight: 500;
+            text-align: left;
+        }
+
+        .opt:hover { background: #f0f4ff; border-color: var(--primary); }
+        .opt.selected { background: var(--primary); color: white; border-color: var(--primary); }
+
+        #rationale-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: #e7f3ff;
+            border-left: 5px solid var(--primary);
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .btn-start { background: var(--primary); color: white; }
+        .btn-next { background: var(--success); color: white; }
+        .btn-rationale { background: var(--accent); color: #333; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 20px auto;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="welcome-screen" class="screen active">
+        <div class="welcome-card">
+            <h1>SCFHS NURSING MOCK V3</h1>
+            <p>High-Level Clinical Vignettes | Critical Care & Emergency Nursing  (Level 4 Difficulty)</p>
+            <input type="text" id="candidate-name" placeholder="Enter Full Name">
+            <br>
+            <button class="btn btn-start" onclick="startExam()">Start Examination</button>
+        </div>
+    </div>
+
+    <div id="exam-screen" class="screen">
+        <div class="exam-header">
+            <div id="display-name">Candidate</div>
+            <div id="progress-text">Q 1/120</div>
+            <div id="timer-text">00:00</div>
+        </div>
+
+        <div class="quiz-card">
+            <div id="vignette" class="vignette">Loading question...</div>
+            <div id="options" class="options-grid"></div>
+
+            <div id="rationale-area"></div>
+
+            <div style="margin-top: 30px; display: flex; gap: 10px;">
+                <button class="btn btn-rationale" id="rat-btn" onclick="showRationale()" disabled>Show Rationale</button>
+                <button class="btn btn-next" id="next-btn" onclick="nextQuestion()" disabled>Next Question</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <div class="result-card">
+            <h2>Results Summary</h2>
+            <div id="score-display" class="score-circle">0%</div>
+            <p id="feedback-text"></p>
+            <button class="btn btn-start" onclick="location.reload()">Restart</button>
+        </div>
+    </div>
+
+<script>
+    // DATA SOURCE (Replace/Add your 1-120 items here)
+    const rawQuestions = [
+    {
+            id: 1,
+            v: "A patient is brought to the ED with a deep laceration on the forearm that is spurting bright red blood. What is the nurse's immediate priority?",
+            a: "Obtain a full set of vital signs.",
+            b: "Apply direct pressure to the wound with a sterile dressing.",
+            c: "Elevate the limb above the heart level.",
+            d: "Start an IV line for fluid resuscitation.",
+            k: "B",
+            str: "STR: Elevating the limb (C) to slow down the circulation.",
+            scfhs: "SCFHS: (B) 'Safe Action'. In active hemorrhage, the priority is to stop the bleed. Direct pressure is the fastest and most effective first step before proceeding to other interventions."
+        },
+        {
+            id: 2,
+            v: "A patient with a 'Chest Tube' suddenly experiences shortness of breath. The nurse notes that the drainage system has tipped over. What is the immediate nursing action?",
+            a: "Clamp the chest tube close to the patient's chest.",
+            b: "Return the drainage system to an upright position and check all connections.",
+            c: "Call the rapid response team immediately.",
+            d: "Increase the suction pressure on the wall regulator.",
+            k: "B",
+            str: "STR: Clamping the tube (A) to prevent air from entering the lungs.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Clamping (A) is dangerous and can cause a tension pneumothorax. Returning the system to upright and checking connections restores the water seal safety mechanism."
+        },
+        {
+            id: 3,
+            v: "During a code blue, the monitor shows 'Ventricular Fibrillation' (VF). The defibrillator is charged and ready. What must the nurse do immediately before delivering the shock?",
+            a: "Administer 1 mg of Epinephrine.",
+            b: "Ensure all personnel are clear of the bed and the patient.",
+            c: "Check for a carotid pulse for 10 seconds.",
+            d: "Perform 5 more cycles of CPR.",
+            k: "B",
+            str: "STR: Checking the pulse (C) to see if the rhythm changed.",
+            scfhs: "SCFHS: (B) 'Safe Action' (NPSG: Patient Safety). Safety is paramount during defibrillation. Checking the pulse (C) during a shockable rhythm on the monitor wastes critical time."
+        },
+        {
+            id: 4,
+            v: "A patient is admitted to the ICU with 'Hypovolemic Shock'. Which clinical finding indicates that the fluid resuscitation is effective?",
+            a: "Heart rate increases to 120 bpm.",
+            b: "Urine output of 0.5 mL/kg/hr or at least 30 mL/hr.",
+            c: "Blood pressure of 80/50 mmHg.",
+            d: "Patient becomes more lethargic.",
+            k: "B",
+            str: "STR: Blood pressure (C) because it shows the heart is pumping.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Urine output is the most sensitive indicator of visceral organ perfusion and successful volume replacement in shock."
+        },
+        {
+            id: 5,
+            v: "A patient is being treated for 'Anaphylactic Shock' after a bee sting. Which medication is the gold standard for first-line treatment?",
+            a: "Diphenhydramine (Benadryl) IV.",
+            b: "Epinephrine (1:1000) Intramuscular (IM).",
+            c: "Hydrocortisone IV.",
+            d: "Albuterol nebulizer.",
+            k: "B",
+            str: "STR: Diphenhydramine (A) to stop the allergic reaction.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Epinephrine is the only medication that reverses upper airway edema and hypotension rapidly. IM is the preferred route in emergencies."
+        },
+        {
+            id: 6,
+            v: "In the 'Emergency Department Triage', which patient should be seen first (Level 1/Resuscitation)?",
+            a: "A 45-year-old with a simple fracture of the ankle.",
+            b: "A 60-year-old complaining of crushing chest pain and diaphoresis.",
+            c: "A 20-year-old with a high fever and productive cough.",
+            d: "A 10-year-old with a superficial burn on the finger.",
+            k: "B",
+            str: "STR: The 20-year-old with fever (C) as it could be sepsis.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Crushing chest pain indicates a potential Myocardial Infarction (MI). This is a life-threatening condition that takes priority over stable infections or fractures."
+        },
+        {
+            id: 7,
+            v: "A patient on a 'Mechanical Ventilator' triggers the 'High-Pressure Alarm'. What is a common cause for this alarm?",
+            a: "A leak in the ventilator circuit.",
+            b: "The patient is biting the endotracheal (ET) tube or needs suctioning.",
+            c: "The ET tube cuff is deflated.",
+            d: "The patient is disconnected from the machine.",
+            k: "B",
+            str: "STR: A leak in the circuit (A) causing air to escape.",
+            scfhs: "SCFHS: (B) 'Safe Action'. High-pressure alarms are triggered by resistance (biting, secretions, kinking). Leaks (A) and disconnections (D) trigger low-pressure alarms."
+        },
+        {
+            id: 8,
+            v: "A patient has a 'Central Venous Pressure' (CVP) reading of 1 mmHg. How should the nurse interpret this finding?",
+            a: "Hypervolemia (Fluid overload).",
+            b: "Hypovolemia or dehydration.",
+            c: "Right-sided heart failure.",
+            d: "Normal finding.",
+            k: "B",
+            str: "STR: Fluid overload (A) since the pressure is being monitored.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Normal CVP is 2-8 mmHg. A low CVP (1 mmHg) indicates low preload, suggesting the patient needs fluid volume."
+        },
+        {
+            id: 9,
+            v: "A patient with a suspected 'Cervical Spine Injury' needs their airway opened. Which technique should the nurse use?",
+            a: "Head-tilt, chin-lift.",
+            b: "Jaw-thrust maneuver.",
+            c: "Flexing the neck forward.",
+            d: "Turning the head to the side.",
+            k: "B",
+            str: "STR: Head-tilt, chin-lift (A) as it is the standard method.",
+            scfhs: "SCFHS: (B) 'Safe Action'. The jaw-thrust maneuver opens the airway without moving the cervical spine, preventing potential paralysis."
+        },
+        {
+            id: 10,
+            v: "A patient is admitted with 'Septic Shock'. After starting oxygen, what is the next priority intervention according to the Sepsis Bundle?",
+            a: "Administering oral antibiotics.",
+            b: "Obtaining blood cultures and initiating aggressive fluid resuscitation.",
+            c: "Giving a dose of Furosemide.",
+            d: "Starting a high-protein diet.",
+            k: "B",
+            str: "STR: Giving Furosemide (C) to keep the kidneys working.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Early blood cultures (before antibiotics) and IV crystalloids (30mL/kg) are the cornerstones of septic shock management."
+        },
+        {
+            id: 11,
+            v: "A patient presents to the ED with 'Heat Stroke'. The body temperature is 41°C. What is the priority nursing goal?",
+            a: "Giving hot tea to induce sweating.",
+            b: "Rapid cooling using cool water spray and fans (evaporative cooling).",
+            c: "Covering the patient with heavy blankets.",
+            d: "Administering Aspirin to lower the fever.",
+            k: "B",
+            str: "STR: Giving Aspirin (D) as it is an antipyretic.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Heat stroke is a failure of thermoregulation, not a typical fever. Aspirin (D) is ineffective. Rapid physical cooling is mandatory to prevent brain damage."
+        },
+        {
+            id: 12,
+            v: "While assessing a patient with a 'Head Injury', the nurse notes clear fluid draining from the nose. What should the nurse do first?",
+            a: "Suction the nose to clear the airway.",
+            b: "Test the drainage for glucose using a dipstick.",
+            c: "Pack the nose tightly with sterile gauze.",
+            d: "Tell the patient to blow their nose.",
+            k: "B",
+            str: "STR: Suctioning the nose (A) to prevent aspiration.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Clear drainage from the nose (rhinorrhea) after head trauma suggests Cerebrospinal Fluid (CSF). Suctioning (A) or blowing the nose (D) can increase intracranial pressure or cause infection."
+        },
+        {
+            id: 13,
+            v: "A patient in the ICU is on 'Nitroprusside' infusion. What is the most critical side effect to monitor for during high-dose therapy?",
+            a: "Hyperglycemia.",
+            b: "Cyanide Toxicity.",
+            c: "Hypokalemia.",
+            d: "Joint pain.",
+            k: "B",
+            str: "STR: Hyperglycemia (A) as the drug is sugar-based.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Nitroprusside is metabolized into thiocyanate. Signs of toxicity include metabolic acidosis, confusion, and hyperreflexia."
+        },
+        {
+            id: 14,
+            v: "A patient is in 'Pulseless Electrical Activity' (PEA). What is the priority nursing action?",
+            a: "Immediate Defibrillation.",
+            b: "High-quality CPR and administration of Epinephrine.",
+            c: "Synchronized Cardioversion.",
+            d: "Perform an ECG to confirm the rhythm.",
+            k: "B",
+            str: "STR: Defibrillation (A) because the monitor shows a rhythm.",
+            scfhs: "SCFHS: (B) 'Safe Action'. PEA is a non-shockable rhythm. Defibrillation (A) will not work. CPR and finding the underlying cause (H's and T's) are required."
+        },
+        {
+            id: 15,
+            v: "A patient has 'Cardiac Tamponade'. Which clinical triad (Beck's Triad) should the nurse expect to find?",
+            a: "Hypertension, bradycardia, and irregular respirations.",
+            b: "Hypotension, jugular venous distention (JVD), and muffled heart sounds.",
+            c: "High fever, chills, and rash.",
+            d: "Tachycardia, clear lung sounds, and high CVP.",
+            k: "B",
+            str: "STR: Hypertension and bradycardia (A) as the heart tries to compensate.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Beck's Triad is the classic sign of fluid in the pericardial sac compressing the heart. (A) is Cushing's Triad for increased ICP."
+        },
+        {
+            id: 16,
+            v: "A nurse is caring for a patient with 'Acute Respiratory Distress Syndrome' (ARDS). Which positioning is often used to improve oxygenation?",
+            a: "Supine with legs elevated.",
+            b: "Prone positioning.",
+            c: "High-Fowler's position.",
+            d: "Left lateral decubitus.",
+            k: "B",
+            str: "STR: Supine (A) to allow the chest to expand.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Prone positioning helps recruit collapsed alveoli in the posterior lung fields and improves ventilation-perfusion matching in ARDS."
+        },
+        {
+            id: 17,
+            v: "A patient is admitted with 'Burns' covering 40% of the Body Surface Area (BSA). During the first 24 hours (Emergent Phase), what is the priority?",
+            a: "Preventing wound infection with antibiotics.",
+            b: "Fluid resuscitation and monitoring for airway edema.",
+            c: "Providing high-calorie nutritional shakes.",
+            d: "Performing skin grafting.",
+            k: "B",
+            str: "STR: Preventing infection (A) because the skin barrier is gone.",
+            scfhs: "SCFHS: (B) 'Safe Action'. The immediate threats to life in major burns are hypovolemic shock (fluid shift) and airway obstruction from smoke inhalation/edema."
+        },
+        {
+            id: 18,
+            v: "A patient has a 'Permanent Pacemaker' inserted. What is a critical discharge teaching point?",
+            a: "It is safe to have an MRI anytime.",
+            b: "Avoid standing near anti-theft devices in stores and check your pulse daily.",
+            c: "You can stop taking all other heart medications now.",
+            d: "The battery will last for 50 years.",
+            k: "B",
+            str: "STR: You can have an MRI (A) because the device is internal.",
+            scfhs: "SCFHS: (B) 'Safe Action'. MRI (A) is often contraindicated unless the device is 'MRI-safe'. Patients must avoid strong magnetic fields and monitor for device failure."
+        },
+        {
+            id: 19,
+            v: "A patient is receiving 'Dopamine' at a high dose (Vasopressor dose). What is the intended effect?",
+            a: "Increase in urine output only.",
+            b: "Increase in Systemic Vascular Resistance (SVR) and Blood Pressure.",
+            c: "Decrease in Heart Rate.",
+            d: "Sedation of the patient.",
+            k: "B",
+            str: "STR: Increase in urine output (A) to protect the kidneys.",
+            scfhs: "SCFHS: (B) 'Safe Action'. At higher doses (>10 mcg/kg/min), Dopamine stimulates alpha-receptors, causing vasoconstriction to treat shock."
+        },
+        {
+            id: 20,
+            v: "A patient with 'Flail Chest' is being assessed. What is the characteristic finding?",
+            a: "A 'sucking' sound during inspiration.",
+            b: "Paradoxical chest wall movement (chest sinks in during inspiration).",
+            c: "Tracheal deviation to the unaffected side.",
+            d: "Bilateral clear breath sounds.",
+            k: "B",
+            str: "STR: A sucking sound (A) as air enters the wound.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Flail chest (multiple rib fractures) causes the injured area to move in the opposite direction of the rest of the chest during breathing."
+        },
+      {
+            id: 21,
+            v: "A patient with a 'Traumatic Brain Injury' (TBI) has an Intracranial Pressure (ICP) monitor. The reading is 25 mmHg. What is the priority nursing intervention?",
+            a: "Place the patient in a flat, supine position.",
+            b: "Ensure the head of the bed is elevated to 30-45 degrees and the head is midline.",
+            c: "Encourage the patient to cough and deep breathe.",
+            d: "Suction the patient every hour to keep the airway clear.",
+            k: "B",
+            str: "STR: Suctioning the patient (D) to ensure maximum oxygenation.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Normal ICP is 5-15 mmHg. 25 mmHg is high. Elevating the HOB and maintaining midline head alignment promotes venous drainage and lowers ICP. Coughing (C) and suctioning (D) significantly increase ICP."
+        },
+        {
+            id: 22,
+            v: "A patient is admitted to the ICU with 'Status Asthmaticus'. The nurse notes that the patient's wheezing has suddenly stopped, and breath sounds are nearly inaudible. What does this indicate?",
+            a: "The patient's condition is improving.",
+            b: "The patient is experiencing a 'Silent Chest', indicating imminent respiratory failure.",
+            c: "The bronchodilator medication is working effectively.",
+            d: "The patient is falling into a deep sleep.",
+            k: "B",
+            str: "STR: The patient is getting better (A) because the noisy breathing stopped.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A 'silent chest' in asthma is a life-threatening emergency. It means air movement is so restricted that wheezing cannot be heard. Immediate intubation may be required."
+        },
+        {
+            id: 23,
+            v: "A patient is in 'Supraventricular Tachycardia' (SVT) with a heart rate of 190 bpm. The patient is stable but symptomatic. What is the first-line pharmacological intervention?",
+            a: "Epinephrine IV push.",
+            b: "Adenosine 6 mg rapid IV push followed by a saline flush.",
+            c: "Atropine 1 mg IV push.",
+            d: "Amiodarone infusion over 24 hours.",
+            k: "B",
+            str: "STR: Atropine (C) to regulate the heart rhythm.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Adenosine is the drug of choice for SVT. It must be given rapidly due to its very short half-life (<10 seconds). (C) is for bradycardia."
+        },
+        {
+            id: 24,
+            v: "A patient with a 'Thoracic Aortic Aneurysm' complains of sudden, intense 'tearing' chest pain that radiates to the back. What should the nurse do first?",
+            a: "Administer a dose of Morphine as requested.",
+            b: "Assess blood pressure in both arms and notify the surgical team immediately.",
+            c: "Encourage the patient to walk to relieve the stress.",
+            d: "Start a high-flow oxygen mask.",
+            k: "B",
+            str: "STR: Giving Morphine (A) to stop the intense pain.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Tearing pain is a classic sign of aortic dissection. Discrepancy in BP between arms is a key finding. This is a surgical emergency."
+        },
+        {
+            id: 25,
+            v: "A patient is receiving a 'Blood Transfusion' and suddenly develops fever, chills, and low back pain. What is the nurse's priority?",
+            a: "Slow down the transfusion rate.",
+            b: "Stop the transfusion and disconnect the tubing at the hub.",
+            c: "Administer Antipyretics and continue monitoring.",
+            d: "Tell the patient this is a normal reaction.",
+            k: "B",
+            str: "STR: Slowing down the rate (A) to see if the patient adjusts.",
+            scfhs: "SCFHS: (B) 'Safe Action' (NPSG: Transfusion Safety). These are signs of a hemolytic reaction. The transfusion must be stopped immediately to prevent renal failure and death."
+        },
+        {
+            id: 26,
+            v: "A patient in the ICU has a 'Pulmonary Artery Catheter'. The 'Pulmonary Artery Wedge Pressure' (PAWP) is 22 mmHg. What does this suggest?",
+            a: "Dehydration.",
+            b: "Left-sided heart failure or pulmonary edema.",
+            c: "Right ventricular infarction.",
+            d: "Hypovolemic shock.",
+            k: "B",
+            str: "STR: Hypovolemic shock (D) as the heart is under pressure.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Normal PAWP is 6-12 mmHg. An elevated PAWP (22 mmHg) indicates fluid overload or failure of the left ventricle."
+        },
+        {
+            id: 27,
+            v: "A patient arrives in the ED with a 'Penetrating Eye Injury' (a piece of metal is stuck in the eye). What should the nurse do?",
+            a: "Remove the object immediately with sterile tweezers.",
+            b: "Patch both eyes and secure the object to prevent movement.",
+            c: "Flush the eye with 1 liter of normal saline.",
+            d: "Apply an antibiotic ointment directly to the object.",
+            k: "B",
+            str: "STR: Removing the object (A) to prevent further damage.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Never remove an impaled object (A). Patching both eyes (B) prevents consensual eye movement, which could worsen the internal injury."
+        },
+        {
+            id: 28,
+            v: "A nurse is caring for a patient on 'Mechanical Ventilation'. The nurse hears a gurgling sound and notes a drop in oxygen saturation. What is the priority?",
+            a: "Call the respiratory therapist to check the machine.",
+            b: "Perform endotracheal suctioning.",
+            c: "Increase the FiO2 to 100%.",
+            d: "Sedate the patient to stop them from fighting the vent.",
+            k: "B",
+            str: "STR: Increasing FiO2 (C) to fix the saturation drop.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Gurgling and drop in SpO2 indicate secretions blocking the airway. Suctioning is required only when indicated (PRN), not routinely."
+        },
+        {
+            id: 29,
+            v: "A patient is admitted with 'Disseminated Intravascular Coagulation' (DIC). What is the primary pathophysiology?",
+            a: "Excessive production of red blood cells.",
+            b: "Simultaneous excessive clotting and depleted clotting factors leading to hemorrhage.",
+            c: "Lack of Vitamin K in the liver.",
+            d: "High levels of iron in the blood.",
+            k: "B",
+            str: "STR: Lack of Vitamin K (C) causing the bleeding.",
+            scfhs: "SCFHS: (B) 'Safe Action'. DIC is a complex systemic thrombo-hemorrhagic disorder. The patient clots too much in small vessels and bleeds elsewhere because clotting factors are used up."
+        },
+        {
+            id: 30,
+            v: "A patient with 'Acute Pancreatitis' is in the ICU. The nurse notes 'Cullen’s Sign' (periumbilical bruising). What does this indicate?",
+            a: "The pancreatitis is resolving.",
+            b: "Intra-abdominal or retroperitoneal hemorrhage.",
+            c: "A normal reaction to pain medication.",
+            d: "The patient is experiencing a localized allergic reaction.",
+            k: "B",
+            str: "STR: Resolution of the disease (A) as the bruising comes to the surface.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Cullen's sign and Grey Turner's sign (flank bruising) indicate severe, necrotizing pancreatitis with internal bleeding."
+        },
+        {
+            id: 31,
+            v: "During the assessment of a patient with a 'Pneumothorax' and a 'Chest Tube', the nurse notes continuous bubbling in the 'Water Seal Chamber'. What does this indicate?",
+            a: "This is a normal finding and shows the lung is re-expanding.",
+            b: "There is an air leak in the system.",
+            c: "The suction is turned up too high.",
+            d: "The chest tube is blocked by a clot.",
+            k: "B",
+            str: "STR: Normal finding (A) indicating air is leaving the pleural space.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Continuous bubbling in the water seal chamber suggests a leak. *Intermittent* bubbling is normal in a patient with a pneumothorax during coughing or expiration."
+        },
+        {
+            id: 32,
+            v: "A patient is in 'Hypovolemic Shock' after a motor vehicle accident. Which IV fluid is most appropriate for rapid volume expansion?",
+            a: "0.45% Normal Saline (Half-normal).",
+            b: "0.9% Normal Saline or Lactated Ringer's.",
+            c: "5% Dextrose in Water (D5W).",
+            d: "Dextrose 10% in water.",
+            k: "B",
+            str: "STR: D5W (C) because the patient needs energy/glucose.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Isotonic crystalloids (B) stay in the intravascular space to increase BP. D5W (C) and 0.45% NS (A) are hypotonic and will move into the cells, potentially causing edema."
+        },
+        {
+            id: 33,
+            v: "A patient in 'Ventricular Tachycardia' (VT) has a pulse but is becoming hypotensive and confused. What is the priority intervention?",
+            a: "Perform unsynchronized defibrillation.",
+            b: "Perform synchronized cardioversion.",
+            c: "Start CPR immediately.",
+            d: "Administer oral Beta-blockers.",
+            k: "B",
+            str: "STR: Defibrillation (A) to stop the rhythm.",
+            scfhs: "SCFHS: (B) 'Safe Action'. VT with a pulse but with signs of instability (hypotension, confusion) requires synchronized cardioversion to avoid hitting the T-wave and causing VF."
+        },
+        {
+            id: 34,
+            v: "A patient with a 'Basilar Skull Fracture' is being monitored. Which finding is most concerning?",
+            a: "Ecchymosis behind the ear (Battle's Sign).",
+            b: "Raccoon eyes (Periorbital ecchymosis).",
+            c: "Frequent swallowing by the patient.",
+            d: "Pain at the fracture site.",
+            k: "C",
+            str: "STR: Battle's Sign (A) because it shows the fracture is severe.",
+            scfhs: "SCFHS: (C) 'Safe Action'. While (A) and (B) are classic signs of the fracture, frequent swallowing (C) can indicate post-nasal drip of CSF, a sign of a worsening leak and risk of meningitis."
+        },
+        {
+            id: 35,
+            v: "A nurse is caring for a patient on 'Total Parenteral Nutrition' (TPN). The new bag of TPN is not yet available from the pharmacy. What should the nurse hang in the meantime?",
+            a: "0.9% Normal Saline.",
+            b: "10% Dextrose in Water (D10W).",
+            c: "Lactated Ringer's.",
+            d: "Heparin flush.",
+            k: "B",
+            str: "STR: Normal Saline (A) to keep the line open.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Abruptly stopping TPN can cause severe hypoglycemia. D10W (B) mimics the glucose content of TPN until the next bag arrives."
+        },
+        {
+            id: 36,
+            v: "A patient is admitted with 'Diabetes Insipidus' after head trauma. What is the characteristic finding?",
+            a: "High urine specific gravity and low urine output.",
+            b: "Low urine specific gravity and high urine output.",
+            c: "Hyperglycemia and ketones in urine.",
+            d: "Weight gain and peripheral edema.",
+            k: "B",
+            str: "STR: High urine specific gravity (A) because the urine is concentrated.",
+            scfhs: "SCFHS: (B) 'Safe Action'. DI is a lack of ADH. The kidneys cannot concentrate urine, leading to massive output of very dilute urine (Specific gravity < 1.005)."
+        },
+        {
+            id: 37,
+            v: "A patient has a 'High-Level Spinal Cord Injury' (T6 or above) and suddenly develops a severe headache, flushing, and a BP of 210/110 mmHg. What is the first nursing action?",
+            a: "Administer a dose of pain medication.",
+            b: "Sit the patient upright and check the urinary catheter for kinks.",
+            c: "Place the patient in Trendelenburg position.",
+            d: "Call the doctor to report a stroke.",
+            k: "B",
+            str: "STR: Calling the doctor (D) immediately for a stroke.",
+            scfhs: "SCFHS: (B) 'Safe Action'. This is Autonomic Dysreflexia. The first priority is to sit the patient up (to lower BP via orthostasis) and then remove the triggering stimulus (usually a full bladder)."
+        },
+        {
+            id: 38,
+            v: "A patient with 'Acute Coronary Syndrome' is receiving 'Nitroglycerin' IV. Which side effect is the nurse most prepared to manage?",
+            a: "Hypertension.",
+            b: "Hypotension and headache.",
+            c: "Bradycardia.",
+            d: "Hyperkalemia.",
+            k: "B",
+            str: "STR: Hypertension (A) as the heart works harder.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Nitroglycerin is a potent vasodilator. It commonly causes significant drops in BP and headaches due to meningeal artery dilation."
+        },
+        {
+            id: 39,
+            v: "In 'Disaster Triage', a patient with a 'tension pneumothorax' should be tagged with which color?",
+            a: "Green (Minor).",
+            b: "Red (Immediate).",
+            c: "Yellow (Delayed).",
+            d: "Black (Expectant).",
+            k: "B",
+            str: "STR: Yellow (C) because they are stable for now.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Tension pneumothorax is a life-threatening but treatable emergency. Red tags are for those who need immediate intervention to survive."
+        },
+        {
+            id: 40,
+            v: "A patient in the ICU has 'Hyperkalemia' (Potassium 7.0 mEq/L) with ECG changes (peaked T waves). Which medication is given to protect the heart (stabilize membranes) first?",
+            a: "Sodium Bicarbonate.",
+            b: "Calcium Gluconate.",
+            c: "Insulin and Glucose.",
+            d: "Kayexalate.",
+            k: "B",
+            str: "STR: Insulin (C) to push potassium into the cells.",
+            scfhs: "SCFHS: (B) 'Safe Action'. While (C) and (D) lower potassium, Calcium Gluconate (B) is the priority to protect the myocardium from arrhythmias until the K+ levels can be lowered."
+        },
+        {
+            id: 41,
+            v: "A patient with a 'Tracheostomy' suddenly coughs it out (accidental decannulation). What is the nurse's first action?",
+            a: "Call the surgical team to take the patient back to OR.",
+            b: "Keep the stoma open with a tracheal dilator or hemostat and attempt to re-insert.",
+            c: "Cover the stoma with an occlusive dressing.",
+            d: "Perform a jaw-thrust maneuver.",
+            k: "B",
+            str: "STR: Covering the stoma (C) to prevent air leaks.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Decannulation is an emergency. The nurse must maintain the airway. (C) would stop the patient from breathing if they are dependent on the stoma."
+        },
+        {
+            id: 42,
+            v: "A patient with 'DKA' (Diabetic Ketoacidosis) has a blood glucose of 500 mg/dL and Kussmaul respirations. What is the primary goal of IV fluid therapy?",
+            a: "To provide calories for metabolism.",
+            b: "To replace lost fluids and dilute the glucose/ketones.",
+            c: "To stop the patient's breathing pattern.",
+            d: "To increase the blood pressure to 160 mmHg.",
+            k: "B",
+            str: "STR: Providing calories (A) since the cells are starving.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Dehydration in DKA is severe. Isotonic fluids are the priority to restore circulatory volume and renal perfusion."
+        },
+        {
+            id: 43,
+            v: "A patient is on 'Warfarin' and has an INR of 8.0 with active bleeding. Which antidote should be administered?",
+            a: "Protamine Sulfate.",
+            b: "Vitamin K (Phytonadione).",
+            c: "Naloxone.",
+            d: "Glucagon.",
+            k: "B",
+            str: "STR: Protamine Sulfate (A) as it is the standard antidote.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Vitamin K reverses Warfarin. (A) reverses Heparin. (C) reverses Opioids."
+        },
+        {
+            id: 44,
+            v: "A patient on a ventilator has 'Positive End-Expiratory Pressure' (PEEP) increased from 5 cmH2O to 15 cmH2O. What complication should the nurse monitor for?",
+            a: "Pneumonia.",
+            b: "Barotrauma (Pneumothorax) and decreased Cardiac Output.",
+            c: "Increased appetite.",
+            d: "Improved skin turgor.",
+            k: "B",
+            str: "STR: Pneumonia (A) because of the tube.",
+            scfhs: "SCFHS: (B) 'Safe Action'. High PEEP increases intrathoracic pressure, which can rupture alveoli (barotrauma) and decrease venous return, lowering BP."
+        },
+        {
+            id: 45,
+            v: "A patient with 'Acute Renal Failure' is receiving 'Hemodialysis'. The patient complains of a headache, nausea, and becomes twitchy. What does this indicate?",
+            a: "Normal side effect of dialysis.",
+            b: "Disequilibrium Syndrome.",
+            c: "The patient is hungry.",
+            d: "The dialysis is finished.",
+            k: "B",
+            str: "STR: Normal side effect (A) after cleaning the blood.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Rapid removal of urea during dialysis creates an osmotic gradient that causes brain swelling (Disequilibrium Syndrome)."
+        },
+        {
+            id: 46,
+            v: "A patient with a 'Permanent Pacemaker' has a spike on the ECG but no QRS complex follows it. What is this called?",
+            a: "Failure to Sense.",
+            b: "Failure to Capture.",
+            c: "Failure to Pace.",
+            d: "Normal function.",
+            k: "B",
+            str: "STR: Failure to Sense (A) because the machine can't see the heart.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Failure to capture means the pacemaker sent an electrical impulse (spike), but the heart muscle did not respond (no QRS)."
+        },
+        {
+            id: 47,
+            v: "A patient with 'COPD' is in respiratory distress. Why should the nurse be cautious about giving high-flow oxygen?",
+            a: "It can cause oxygen-induced carbon dioxide narcosis (loss of hypoxic drive).",
+            b: "The patient might become addicted to oxygen.",
+            c: "High flow oxygen is too expensive.",
+            d: "The patient will start coughing more.",
+            k: "A",
+            str: "STR: Oxygen addiction (B) which is hard to break.",
+            scfhs: "SCFHS: (A) 'Safe Action'. In chronic CO2 retainers, the drive to breathe is low oxygen levels. Giving too much oxygen can stop their breathing stimulus."
+        },
+        {
+            id: 48,
+            v: "A nurse is caring for a patient after a 'Percutaneous Coronary Intervention' (PCI). The nurse finds a large hematoma at the femoral artery site. What is the priority?",
+            a: "Apply heat to the site to dissolve the clot.",
+            b: "Apply firm manual pressure to the site.",
+            c: "Instruct the patient to walk around.",
+            d: "Cover it with a light band-aid.",
+            k: "B",
+            str: "STR: Applying heat (A) to increase blood flow.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Bleeding after PCI can be life-threatening. Manual pressure is the immediate action to control the hematoma and prevent shock."
+        },
+        {
+            id: 49,
+            v: "A patient in 'Hypovolemic Shock' has a 'Mean Arterial Pressure' (MAP) of 55 mmHg. What is the nursing priority?",
+            a: "Assess the patient's temperature.",
+            b: "Increase the IV fluid rate and notify the physician.",
+            c: "Provide a light snack.",
+            d: "Document it as a normal finding.",
+            k: "B",
+            str: "STR: Assessing temperature (A) to prevent shivering.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A MAP of at least 60-65 mmHg is needed to provide enough blood to the brain and kidneys. 55 mmHg is dangerously low."
+        },
+        {
+            id: 50,
+            v: "A patient with 'Liver Cirrhosis' develops 'Esophageal Varices' and is vomiting bright red blood. Which procedure is used to control the bleeding temporarily?",
+            a: "Insertion of a Nasogastric (NG) tube.",
+            b: "Sengstaken-Blakemore tube (Balloon tamponade).",
+            c: "Colonoscopy.",
+            d: "Abdominal X-ray.",
+            k: "B",
+            str: "STR: NG tube (A) to suction the blood.",
+            scfhs: "SCFHS: (B) 'Safe Action'. The Sengstaken-Blakemore tube uses balloons to apply direct pressure to the bleeding varices in the esophagus and stomach."
+        },
+      {
+            id: 51,
+            v: "A patient with 'Acute Myocardial Infarction' suddenly develops 'Ventricular Fibrillation' (VF). What is the nurse's first action?",
+            a: "Administer 1 mg of Epinephrine IV.",
+            b: "Initiate CPR and call for a defibrillator.",
+            c: "Prepare for synchronized cardioversion.",
+            d: "Check the blood pressure.",
+            k: "B",
+            str: "STR: Synchronized cardioversion (C) to reset the heart.",
+            scfhs: "SCFHS: (B) 'Safe Action'. VF is a pulseless rhythm. The priority is high-quality CPR followed by immediate unsynchronized defibrillation. Cardioversion (C) cannot be synchronized because there is no R-wave.",
+        },
+        {
+            id: 52,
+            v: "A patient in the ICU is diagnosed with 'Syndrome of Inappropriate Antidiuretic Hormone' (SIADH). Which laboratory finding should the nurse expect?",
+            a: "Serum Sodium 150 mEq/L and high urine output.",
+            b: "Serum Sodium 125 mEq/L and low urine output.",
+            c: "Blood Glucose 300 mg/dL.",
+            d: "Hypokalemia.",
+            k: "B",
+            str: "STR: High serum sodium (A) because the body is retaining water.",
+            scfhs: "SCFHS: (B) 'Safe Action'. SIADH involves excessive ADH, leading to water retention, dilutional hyponatremia (low sodium), and concentrated urine.",
+        },
+        {
+            id: 53,
+            v: "A patient with a 'Chest Tube' has 200 mL of bright red drainage in the first hour after thoracic surgery. What is the priority nursing action?",
+            a: "Document the finding as a normal post-operative occurrence.",
+            b: "Notify the surgeon immediately.",
+            c: "Clamp the chest tube to stop the bleeding.",
+            d: "Increase the suction level.",
+            k: "B",
+            str: "STR: Documenting (A) as it is expected after surgery.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Drainage > 100 mL/hr in the first few hours is a sign of active hemorrhage and requires immediate surgical notification.",
+        },
+        {
+            id: 54,
+            v: "A patient has 'Third-Degree Heart Block' on the monitor. The patient is pale and the heart rate is 30 bpm. What is the priority treatment?",
+            a: "Administer Lidocaine 100 mg IV.",
+            b: "Prepare for Transcutaneous Pacing (TCP).",
+            c: "Give a dose of Digoxin.",
+            d: "Ask the patient to cough vigorously.",
+            k: "B",
+            str: "STR: Giving Lidocaine (A) to stabilize the heart rate.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Third-degree block is a complete dissociation. Atropine is often ineffective. External pacing (TCP) is the immediate life-saving intervention.",
+        },
+        {
+            id: 55,
+            v: "A patient with 'Chest Trauma' has muffled heart sounds, jugular vein distention, and a BP of 80/40 mmHg. What procedure should the nurse prepare for?",
+            a: "Chest tube insertion.",
+            b: "Pericardiocentesis.",
+            c: "Tracheostomy.",
+            d: "Thoracentesis.",
+            k: "B",
+            str: "STR: Chest tube insertion (A) to drain air from the lungs.",
+            scfhs: "SCFHS: (B) 'Safe Action'. These signs constitute Beck’s Triad, indicating Cardiac Tamponade. Pericardiocentesis is required to remove fluid from the pericardial sac.",
+        },
+        {
+            id: 56,
+            v: "A nurse is caring for a patient on a 'Mechanical Ventilator'. The 'Low-Pressure Alarm' sounds. Which of the following is a potential cause?",
+            a: "The patient is biting the tube.",
+            b: "Disconnection of the ventilator circuit.",
+            c: "Increased airway secretions.",
+            d: "Pulmonary edema.",
+            k: "B",
+            str: "STR: Biting the tube (A) causing low pressure in the machine.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Low-pressure alarms are triggered by a loss of resistance, such as a leak or disconnection. (A), (C), and (D) cause high-pressure alarms.",
+        },
+        {
+            id: 57,
+            v: "A patient is admitted with 'Acute Salicylate (Aspirin) Poisoning'. Which acid-base imbalance is most commonly seen initially?",
+            a: "Respiratory Acidosis.",
+            b: "Respiratory Alkalosis.",
+            c: "Metabolic Alkalosis.",
+            d: "Compensated Respiratory Acidosis.",
+            k: "B",
+            str: "STR: Respiratory Acidosis (A) due to lung suppression.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Salicylates stimulate the respiratory center, causing hyperventilation and initial respiratory alkalosis, often followed by metabolic acidosis.",
+        },
+        {
+            id: 58,
+            v: "A patient in the ED has a 'Chemical Burn' in the eyes. What is the priority nursing action?",
+            a: "Wait for the eye specialist to arrive.",
+            b: "Irrigate the eyes with Normal Saline for at least 15-30 minutes.",
+            c: "Apply a sterile eye patch and keep the eyes closed.",
+            d: "Neutralize the chemical with a weak acid/base solution.",
+            k: "B",
+            str: "STR: Applying an eye patch (C) to prevent light sensitivity.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Immediate and profuse irrigation is the standard of care to minimize tissue damage. Never try to neutralize the chemical (D).",
+        },
+        {
+            id: 59,
+            v: "A patient with a 'Fractured Femur' suddenly develops shortness of breath, tachycardia, and petechiae on the chest. What is the likely complication?",
+            a: "Pulmonary Embolism (Blood clot).",
+            b: "Fat Embolism Syndrome.",
+            c: "Myocardial Infarction.",
+            d: "Pneumonia.",
+            k: "B",
+            str: "STR: Pulmonary Embolism (A) which is common after bone fractures.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Petechiae on the chest and neck are a hallmark sign of Fat Embolism, distinguishing it from a regular Pulmonary Embolism.",
+        },
+        {
+            id: 60,
+            v: "A patient in the ICU has 'Hypermagnesemia' (Magnesium 4.0 mEq/L). Which assessment finding is most likely?",
+            a: "Hyperreflexia (Overactive reflexes).",
+            b: "Loss of Deep Tendon Reflexes (DTR) and respiratory depression.",
+            c: "Tachycardia and hypertension.",
+            d: "Seizures.",
+            k: "B",
+            str: "STR: Hyperreflexia (A) since magnesium stimulates the nerves.",
+            scfhs: "SCFHS: (B) 'Safe Action'. High magnesium acts as a CNS depressant. Loss of reflexes (B) is an early sign of toxicity.",
+        },
+        {
+            id: 61,
+            v: "A patient with 'Acute Ischemic Stroke' is considered for 'Alteplase' (tPA). Which finding is an absolute contraindication?",
+            a: "Age over 60.",
+            b: "Symptoms started 2 hours ago.",
+            c: "Active internal bleeding or recent intracranial surgery.",
+            d: "History of diabetes.",
+            k: "C",
+            str: "STR: Symptoms started 2 hours ago (B) as it's too late for the drug.",
+            scfhs: "SCFHS: (C) 'Safe Action'. tPA is a 'clot buster'. Recent surgery or active bleeding carries a high risk of fatal hemorrhage. 2 hours (B) is within the golden window.",
+        },
+        {
+            id: 62,
+            v: "A patient has a 'Swan-Ganz' catheter. The nurse notes the waveform remains in a 'wedge' pattern after the balloon is deflated. What is the priority?",
+            a: "Document it as a normal finding.",
+            b: "Ask the patient to cough and change position, then notify the provider.",
+            c: "Increase the inflation of the balloon.",
+            d: "Check the blood pressure.",
+            k: "B",
+            str: "STR: Increasing the inflation (C) to reset the catheter.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A spontaneous 'wedge' means the catheter is migrated too far into a small vessel, risking pulmonary infarction. It must be pulled back immediately by authorized staff.",
+        },
+        {
+            id: 63,
+            v: "A patient is admitted with 'Carbon Monoxide (CO) Poisoning'. What is the most reliable clinical sign?",
+            a: "Cherry-red skin color.",
+            b: "Oxygen Saturation (SpO2) of 100% on the pulse oximeter.",
+            c: "Cyanosis of the lips.",
+            d: "Headache and altered mental status.",
+            k: "D",
+            str: "STR: SpO2 of 100% (B) confirming the patient is okay.",
+            scfhs: "SCFHS: (D) 'Safe Action'. Cherry-red skin (A) is a late/post-mortem sign. Pulse oximeters (B) cannot distinguish between oxyhemoglobin and carboxyhemoglobin, giving a false 100% reading.",
+        },
+        {
+            id: 64,
+            v: "A patient with 'Hypocalcemia' (Calcium 6.5 mg/dL) is being monitored. Which sign indicates neuromuscular irritability?",
+            a: "Positive Chvostek’s sign.",
+            b: "Negative Trousseau’s sign.",
+            c: "Flaccid paralysis.",
+            d: "Hypotension.",
+            k: "A",
+            str: "STR: Negative Trousseau's sign (B) as a positive response.",
+            scfhs: "SCFHS: (A) 'Safe Action'. Chvostek's sign (facial twitching when the nerve is tapped) is a classic indicator of tetany due to low calcium.",
+        },
+        {
+            id: 65,
+            v: "A patient in 'Shock' is receiving 'Norepinephrine' (Levophed). What is the primary nursing goal of this medication?",
+            a: "To decrease heart rate.",
+            b: "To increase Mean Arterial Pressure (MAP) through vasoconstriction.",
+            c: "To sedate the patient.",
+            d: "To increase urine output directly.",
+            k: "B",
+            str: "STR: To increase urine output (D) by flushing the kidneys.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Norepinephrine is a potent alpha-agonist used to increase SVR and BP in distributive shock (e.g., Sepsis).",
+        },
+        {
+            id: 66,
+            v: "A patient with 'Cirrhosis' is being treated for 'Hepatic Encephalopathy'. Which medication is given to reduce ammonia levels?",
+            a: "Furosemide.",
+            b: "Lactulose.",
+            c: "Spironolactone.",
+            d: "Propranolol.",
+            k: "B",
+            str: "STR: Furosemide (A) to flush out the ammonia through urine.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Lactulose traps ammonia in the gut and expels it through bowel movements (diarrhea is the expected effect).",
+        },
+        {
+            id: 67,
+            v: "In 'Triage', a patient with an 'Open Abdominal Wound' with evisceration should be handled how?",
+            a: "Push the organs back into the abdomen.",
+            b: "Cover the organs with a sterile, moist (saline) dressing.",
+            c: "Cover the organs with a dry, clean towel.",
+            d: "Leave the wound open to the air.",
+            k: "B",
+            str: "STR: Pushing the organs back (A) to protect them from infection.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Eviscerated organs must be kept moist to prevent ischemia. Pushing them back (A) increases the risk of perforation and infection.",
+        },
+        {
+            id: 68,
+            v: "A patient is in the ICU for 'Upper GI Bleeding'. The nurse notes 'Melena'. What does this look like?",
+            a: "Bright red blood in the stool.",
+            b: "Black, tarry, foul-smelling stools.",
+            c: "Vomiting bright red blood.",
+            d: "Clay-colored stools.",
+            k: "B",
+            str: "STR: Bright red blood in stool (A) as the blood is fresh.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Melena indicates blood that has been digested, usually from an upper GI source. (A) is hematochezia, usually from a lower GI source.",
+        },
+        {
+            id: 69,
+            v: "A patient has 'Cardiac Arrest' and the rhythm is 'Asystole'. What is the correct ACLS intervention?",
+            a: "Shock at 200 Joules immediately.",
+            b: "High-quality CPR and Epinephrine 1 mg every 3-5 minutes.",
+            c: "Synchronized cardioversion.",
+            d: "Administering a bolus of Lidocaine.",
+            k: "B",
+            str: "STR: Shocking the patient (A) because there is no rhythm.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Asystole is a non-shockable rhythm. CPR and Vasopressors are the only primary treatments.",
+        },
+        {
+            id: 70,
+            v: "A patient is on 'Heparin' infusion for 'DVT'. The aPTT is 120 seconds (Control: 30s). What should the nurse do?",
+            a: "Increase the infusion rate.",
+            b: "Stop the infusion and prepare Protamine Sulfate if bleeding is present.",
+            c: "Continue the infusion at the same rate.",
+            d: "Give the patient Vitamin K.",
+            k: "B",
+            str: "STR: Giving Vitamin K (D) to reverse the Heparin.",
+            scfhs: "SCFHS: (B) 'Safe Action'. The therapeutic range for aPTT is 1.5 - 2.5 times the control. 120 seconds is too high (4 times), risking major bleeding.",
+        },
+        {
+            id: 71,
+            v: "A patient with 'Acute Kidney Injury' (AKI) is in the 'Oliguric Phase'. Which electrolyte imbalance is most dangerous?",
+            a: "Hypokalemia.",
+            b: "Hyperkalemia.",
+            c: "Hyponatremia.",
+            d: "Hypercalcemia.",
+            k: "B",
+            str: "STR: Hypokalemia (A) because the kidneys are flushing it out.",
+            scfhs: "SCFHS: (B) 'Safe Action'. In oliguria, the kidneys fail to excrete potassium, leading to hyperkalemia and potential cardiac arrest.",
+        },
+        {
+            id: 72,
+            v: "A patient with 'Thyroid Storm' (Thyrotoxic Crisis) is admitted to the ICU. Which symptom is a priority for intervention?",
+            a: "Hyperthermia (Fever >40°C) and severe tachycardia.",
+            b: "Weight gain and constipation.",
+            c: "Dry skin and bradycardia.",
+            d: "Lethargy.",
+            k: "A",
+            str: "STR: Weight gain (B) due to hormone changes.",
+            scfhs: "SCFHS: (A) 'Safe Action'. Thyroid storm is extreme hypermetabolism. High fever and tachycardia can lead to high-output heart failure.",
+        },
+        {
+            id: 73,
+            v: "A patient in the ED is suspected of having an 'Opioid Overdose'. The respiratory rate is 6 bpm. What is the priority?",
+            a: "Administer Naloxone (Narcan).",
+            b: "Start a bag-mask ventilation.",
+            c: "Give the patient a cup of strong coffee.",
+            d: "Perform a chest X-ray.",
+            k: "A",
+            str: "STR: Bag-mask ventilation (B) to support the breathing first.",
+            scfhs: "SCFHS: (A) 'Safe Action'. While ventilation (B) is important, Naloxone is the definitive reversal agent that restores the respiratory drive in opioid toxicity.",
+        },
+        {
+            id: 74,
+            v: "A patient on a 'Ventilator' has 'Auto-PEEP' occurring. What does this mean?",
+            a: "The patient is breathing too slowly.",
+            b: "Incomplete exhalation, leaving air trapped in the lungs.",
+            c: "The machine is giving too much oxygen.",
+            d: "The patient is disconnected.",
+            k: "B",
+            str: "STR: The patient is breathing too slowly (A) causing air to build up.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Auto-PEEP (breath stacking) increases intrathoracic pressure and can lead to barotrauma and hypotension.",
+        },
+        {
+            id: 75,
+            v: "A patient with a 'Head Injury' has a GCS score of 7. What is the priority nursing interpretation?",
+            a: "The patient is awake and alert.",
+            b: "The patient is in a coma and requires airway protection (intubation).",
+            c: "The patient has a mild concussion.",
+            d: "The patient is ready for discharge.",
+            k: "B",
+            str: "STR: The patient has a mild concussion (C) and needs rest.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A GCS score of 8 or less typically indicates a coma and the inability to maintain a patent airway.",
+        },
+      {
+            id: 76,
+            v: "A patient with 'Acute Lung Injury' (ALI) is on a ventilator. The nurse notes the 'Plateau Pressure' is 35 cmH2O. What does this indicate?",
+            a: "The patient has excellent lung compliance.",
+            b: "High risk for barotrauma/lung injury due to decreased compliance.",
+            c: "The endotracheal tube is too small.",
+            d: "The patient needs more sedation.",
+            k: "B",
+            str: "STR: Excellent compliance (A) as the pressure is high enough to open alveoli.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Plateau pressure should ideally be <30 cmH2O. High plateau pressure (35 cmH2O) indicates stiff lungs and puts the patient at risk for pneumothorax."
+        },
+        {
+            id: 77,
+            v: "A patient is admitted with 'Status Epilepticus'. Which medication is typically administered first to stop the seizure activity immediately?",
+            a: "Phenytoin (Dilantin).",
+            b: "Lorazepam (Ativan) or Diazepam (Valium).",
+            c: "Phenobarbital.",
+            d: "Magnesium Sulfate.",
+            k: "B",
+            str: "STR: Phenytoin (A) because it is a long-acting anticonvulsant.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Benzodiazepines are first-line to stop active seizures. Phenytoin (A) is used later for long-term stabilization."
+        },
+        {
+            id: 78,
+            v: "A patient in the ICU has a 'Mean Arterial Pressure' (MAP) of 45 mmHg despite fluid resuscitation. What is the priority risk for this patient?",
+            a: "Acute Kidney Injury (AKI) and cerebral ischemia.",
+            b: "Fluid overload.",
+            c: "Increased intracranial pressure.",
+            d: "Hyperthermia.",
+            k: "A",
+            str: "STR: Fluid overload (B) from the resuscitation efforts.",
+            scfhs: "SCFHS: (A) 'Safe Action'. A MAP below 65 mmHg is insufficient to perfuse vital organs, especially the kidneys and brain, leading to multi-organ failure."
+        },
+        {
+            id: 79,
+            v: "A patient with a 'Chest Tube' suddenly develops 'Subcutaneous Emphysema' (crackling sensation under the skin) around the insertion site. What should the nurse do?",
+            a: "Document it as a normal finding.",
+            b: "Notify the physician and assess for a tube malposition or air leak.",
+            c: "Apply a heating pad to the area.",
+            d: "Encourage the patient to hold their breath.",
+            k: "B",
+            str: "STR: Normal finding (A) as air often escapes during insertion.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Subcutaneous emphysema suggests that air is escaping from the pleural space into the tissue, often due to a blocked or dislodged chest tube."
+        },
+        {
+            id: 80,
+            v: "A patient with 'Chest Pain' has an ECG showing 'ST-segment depression' in leads V1-V4. What does this finding suggest?",
+            a: "Acute Myocardial Infarction (STEMI).",
+            b: "Myocardial Ischemia or Non-ST Elevation MI (NSTEMI).",
+            c: "Normal cardiac function.",
+            d: "Hyperkalemia.",
+            k: "B",
+            str: "STR: STEMI (A) because the ST segment is moving.",
+            scfhs: "SCFHS: (B) 'Safe Action'. ST-depression and T-wave inversion indicate ischemia, whereas ST-elevation (A) indicates injury/infarction."
+        },
+        {
+            id: 81,
+            v: "A patient in the ED is suspected of having a 'Cardiac Tamponade'. The nurse notes 'Pulsus Paradoxus'. What is this?",
+            a: "An increase in heart rate during inspiration.",
+            b: "A drop in systolic blood pressure >10 mmHg during inspiration.",
+            c: "A difference in BP between the right and left arms.",
+            d: "Irregular pulse during exercise.",
+            k: "B",
+            str: "STR: Difference in BP between arms (C) indicating a blockage.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Pulsus paradoxus is a classic sign of tamponade, where the filling of the right heart during inspiration further compresses the left heart."
+        },
+        {
+            id: 82,
+            v: "A nurse is preparing to suction a patient with 'Increased Intracranial Pressure'. What is a key safety intervention?",
+            a: "Suction for at least 30 seconds to ensure a clear airway.",
+            b: "Hyperoxygenate and limit suctioning to less than 10 seconds per pass.",
+            c: "Suction the patient every 30 minutes routinely.",
+            d: "Perform suctioning only when the patient is coughing.",
+            k: "B",
+            str: "STR: Suctioning for 30 seconds (A) to remove all secretions.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Suctioning increases ICP and decreases cerebral oxygenation. It must be brief (B) and done only when absolutely necessary (PRN)."
+        },
+        {
+            id: 83,
+            v: "A patient is admitted with 'Hypovolemic Shock'. The nurse is ordered to give 'Albumin 5%'. What is the purpose of this fluid?",
+            a: "To provide electrolytes.",
+            b: "To increase oncotic pressure and pull fluid into the vascular space.",
+            c: "To provide nutrition.",
+            d: "To thin the blood.",
+            k: "B",
+            str: "STR: To provide nutrition (C) because it is a protein.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Albumin is a colloid. It increases osmotic pressure, making it effective for volume expansion in shock."
+        },
+        {
+            id: 84,
+            v: "A patient with 'Chronic Obstructive Pulmonary Disease' (COPD) is on a ventilator. The nurse notes 'Respiratory Acidosis' on the ABG. What is the most likely ventilator adjustment needed?",
+            a: "Decrease the Respiratory Rate (RR).",
+            b: "Increase the Tidal Volume (VT) or Respiratory Rate (RR).",
+            c: "Increase the FiO2 to 100%.",
+            d: "Decrease the PEEP.",
+            k: "B",
+            str: "STR: Decrease the RR (A) to let the patient rest.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Respiratory acidosis (high CO2) means the patient is 'under-ventilating'. Increasing the 'Minute Ventilation' (RR x VT) helps blow off excess CO2."
+        },
+        {
+            id: 85,
+            v: "A patient in 'Septic Shock' has a high heart rate and low BP. The nurse notes the skin is 'warm and flushed'. Which stage of shock is this?",
+            a: "Progressive stage.",
+            b: "Early (Hyperdynamic/Warm) stage.",
+            c: "Refractory stage.",
+            d: "Late (Cold) stage.",
+            k: "B",
+            str: "STR: Late stage (D) as the body is burning up.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Distributive shock (sepsis) initially causes vasodilation, making the skin warm. As it progresses to the cold stage (D), vasoconstriction occurs."
+        },
+        {
+            id: 86,
+            v: "A patient has a 'Temporary Venous Pacemaker'. The nurse notes 'Pacer Spikes' occurring during the T-wave of the patient's own rhythm. What is the risk?",
+            a: "The patient will stop breathing.",
+            b: "V-fib (Ventricular Fibrillation) due to the 'R-on-T' phenomenon.",
+            c: "The pacemaker battery will die.",
+            d: "Normal finding.",
+            k: "B",
+            str: "STR: Normal finding (D) as the pacer is doing its job.",
+            scfhs: "SCFHS: (B) 'Safe Action'. This is a 'Failure to Sense'. If a pacemaker fires during the vulnerable T-wave period, it can trigger lethal arrhythmias like VF."
+        },
+        {
+            id: 87,
+            v: "A patient with 'Acute Pancreatitis' develops 'Trousseau's Sign'. Which electrolyte should the nurse check?",
+            a: "Sodium.",
+            b: "Calcium.",
+            c: "Potassium.",
+            d: "Magnesium.",
+            k: "B",
+            str: "STR: Potassium (C) because it affects heart rhythm.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Pancreatitis causes calcium to bind with fatty acids (saponification), leading to hypocalcemia and neuromuscular irritability (Trousseau's sign)."
+        },
+        {
+            id: 88,
+            v: "A patient with 'Superior Vena Cava (SVC) Syndrome' is admitted. Which symptom is expected?",
+            a: "Edema of the legs and feet.",
+            b: "Facial edema and distended neck veins.",
+            c: "Severe abdominal pain.",
+            d: "Hypotension in the lower extremities.",
+            k: "B",
+            str: "STR: Leg edema (A) due to backflow.",
+            scfhs: "SCFHS: (B) 'Safe Action'. SVC syndrome involves obstruction of blood flow from the upper body to the heart, causing swelling in the face, neck, and arms."
+        },
+        {
+            id: 89,
+            v: "A patient is in 'Anaphylactic Shock'. After Epinephrine, the patient is still wheezing. What is the next priority medication?",
+            a: "Dopamine.",
+            b: "Albuterol (Salbutamol) nebulizer.",
+            c: "Insulin.",
+            d: "Furosemide.",
+            k: "B",
+            str: "STR: Dopamine (A) to increase blood pressure.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Bronchodilators (B) help relieve the bronchospasm associated with anaphylaxis after the primary life-threat is addressed with Epinephrine."
+        },
+        {
+            id: 90,
+            v: "A patient with 'Brain Death' is being evaluated for organ donation. Which assessment finding is consistent with brain death?",
+            a: "Pupils that are pinpoint and reactive.",
+            b: "Absence of corneal, gag, and cough reflexes.",
+            c: "Occasional spontaneous breaths.",
+            d: "Withdrawal from painful stimuli.",
+            k: "B",
+            str: "STR: Pinpoint pupils (A) showing brain stem activity.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Brain death requires the total, irreversible loss of all brain functions, including the brainstem (reflexes) and respiratory drive."
+        },
+        {
+            id: 91,
+            v: "A patient is receiving 'Dobutamine' infusion. What is the expected therapeutic effect?",
+            a: "Vasoconstriction and increased BP.",
+            b: "Increased myocardial contractility (Inotropic effect).",
+            c: "Lowering the heart rate.",
+            d: "Increasing urine output by dilating renal arteries.",
+            k: "B",
+            str: "STR: Vasoconstriction (A) to treat shock.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Dobutamine is a positive inotrope used in cardiogenic shock to help the heart pump more effectively without significantly increasing heart rate."
+        },
+        {
+            id: 92,
+            v: "A patient with a 'Chest Tube' suddenly has it pulled out by accident. What is the immediate nursing action?",
+            a: "Try to reinsert the tube immediately.",
+            b: "Cover the site with a sterile occlusive dressing taped on three sides.",
+            c: "Leave the wound open to drain air.",
+            d: "Call the surgical team while holding the wound open.",
+            k: "B",
+            str: "STR: Leaving the wound open (C) to prevent tension pneumothorax.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Taping on three sides acts as a one-way valve, allowing air to escape but not enter the pleural space, preventing a tension pneumothorax."
+        },
+        {
+            id: 93,
+            v: "A patient is in 'Ventricular Tachycardia' (VT) and is 'Pulseless'. What is the priority?",
+            a: "Defibrillation.",
+            b: "Synchronized Cardioversion.",
+            c: "Epinephrine 1 mg IV.",
+            d: "Amiodarone 300 mg IV.",
+            k: "A",
+            str: "STR: Synchronized Cardioversion (B) to match the R-wave.",
+            scfhs: "SCFHS: (A) 'Safe Action'. Pulseless VT is treated exactly like V-fib: Immediate unsynchronized defibrillation. Cardioversion (B) is only for patients with a pulse."
+        },
+        {
+            id: 94,
+            v: "A patient has 'Neurogenic Shock' after a spinal cord injury. Which clinical finding is unique to this type of shock?",
+            a: "Tachycardia and cool skin.",
+            b: "Bradycardia and warm, dry skin.",
+            c: "Hypertension and sweating.",
+            d: "Wheezing and hives.",
+            k: "B",
+            str: "STR: Tachycardia (A) as the heart compensates.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Loss of sympathetic tone leads to massive vasodilation (warm skin) and the inability to increase heart rate (bradycardia), unlike other forms of shock."
+        },
+        {
+            id: 95,
+            v: "A patient in the ICU has a 'Urine Output' of 10 mL over the last two hours. The patient's BP is 85/50 mmHg. What should the nurse do first?",
+            a: "Administer a dose of Furosemide (Lasix).",
+            b: "Perform a fluid challenge (bolus) as ordered.",
+            c: "Insert a larger urinary catheter.",
+            d: "Document it as a normal response to stress.",
+            k: "B",
+            str: "STR: Administering Furosemide (A) to force the kidneys to work.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Low urine output with hypotension usually indicates 'Pre-renal' failure (dehydration). Giving a diuretic (A) without fixing the volume first will worsen the shock."
+        },
+        {
+            id: 96,
+            v: "A patient with 'Flail Chest' is being monitored for 'Respiratory Failure'. Which finding is most indicative of the need for mechanical ventilation?",
+            a: "PaO2 of 80 mmHg on room air.",
+            b: "Paradoxical chest movement and PaO2 < 60 mmHg on oxygen.",
+            c: "Respiratory rate of 20 bpm.",
+            d: "Pulse oximetry of 94%.",
+            k: "B",
+            str: "STR: PaO2 of 80 mmHg (A) as it is borderline low.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Severe flail chest with hypoxia (PaO2 < 60) requires intubation and positive pressure ventilation to stabilize the chest wall and improve gas exchange."
+        },
+        {
+            id: 97,
+            v: "A patient is admitted with 'Aortic Dissection'. The nurse is ordered to maintain a 'Target Systolic BP' of 100-110 mmHg. Why?",
+            a: "To prevent kidney failure.",
+            b: "To reduce the shearing force on the aortic wall and prevent rupture.",
+            c: "To keep the patient awake.",
+            d: "To ensure the heart rate remains high.",
+            k: "B",
+            str: "STR: To prevent kidney failure (A) by ensuring perfusion.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Lowering the BP and HR (contractility) is critical to prevent the dissection from extending further or rupturing the aorta."
+        },
+        {
+            id: 98,
+            v: "A patient has 'Acute Respiratory Distress Syndrome' (ARDS). The ventilator is set to 'Low Tidal Volume' ventilation. What is the reason for this strategy?",
+            a: "To make the patient more comfortable.",
+            b: "To prevent 'Volutrauma' (lung injury from overdistension).",
+            c: "To increase the CO2 levels.",
+            d: "To save on oxygen costs.",
+            k: "B",
+            str: "STR: To increase CO2 (C) to stimulate breathing.",
+            scfhs: "SCFHS: (B) 'Safe Action'. ARDS lungs are 'small' and fragile (baby lung). High tidal volumes can rupture alveoli. Low volume strategy is the gold standard for survival."
+        },
+        {
+            id: 99,
+            v: "A patient is in 'Cariogenic Shock' after an MI. Which device is used to reduce the workload of the heart and increase coronary perfusion?",
+            a: "External Pacemaker.",
+            b: "Intra-Aortic Balloon Pump (IABP).",
+            c: "Ventricular Shunt.",
+            d: "Hemodialysis machine.",
+            k: "B",
+            str: "STR: External Pacemaker (A) to speed up the heart.",
+            scfhs: "SCFHS: (B) 'Safe Action'. The IABP inflates during diastole (increasing heart perfusion) and deflates just before systole (decreasing afterload/workload)."
+        },
+        {
+            id: 100,
+            v: "A patient with 'Head Injury' is being monitored. The 'Cerebral Perfusion Pressure' (CPP) is 40 mmHg. How should the nurse interpret this?",
+            a: "Normal cerebral perfusion.",
+            b: "Dangerously low cerebral perfusion; risk of brain ischemia.",
+            c: "High perfusion; risk of brain bleed.",
+            d: "The monitor is broken.",
+            k: "B",
+            str: "STR: Normal perfusion (A) as it is within range.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Normal CPP is 60-100 mmHg. A CPP of 40 mmHg means the brain is not receiving enough blood and oxygen."
+        },
+      {
+            id: 101,
+            v: "A patient is admitted to the ICU with 'Hyperosmolar Hyperglycemic State' (HHS). Which clinical feature distinguishes HHS from Diabetic Ketoacidosis (DKA)?",
+            a: "Blood glucose levels above 300 mg/dL.",
+            b: "Presence of significant ketosis and metabolic acidosis.",
+            c: "Extreme dehydration and absence of significant ketosis.",
+            d: "Increased respiratory rate (Kussmaul breathing).",
+            k: "C",
+            str: "STR: Presence of ketosis (B) because both involve high sugar.",
+            scfhs: "SCFHS: (C) 'Safe Action'. HHS occurs typically in Type 2 DM with enough insulin to prevent ketosis but not enough to prevent extreme hyperglycemia and osmotic diuresis.",
+        },
+        {
+            id: 102,
+            v: "A patient with a 'Head Injury' develops 'Cushing’s Triad'. Which set of vital signs does the nurse expect to see?",
+            a: "Hypotension, tachycardia, and tachypnea.",
+            b: "Bradycardia, hypertension with widening pulse pressure, and irregular respirations.",
+            c: "Hypertension, tachycardia, and fever.",
+            d: "Hypotension, bradycardia, and Cheyne-Stokes breathing.",
+            k: "B",
+            str: "STR: Hypotension and tachycardia (A) as seen in shock.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Cushing's Triad is a late sign of increased intracranial pressure and impending brain herniation.",
+        },
+        {
+            id: 103,
+            v: "A patient is receiving 'Magnesium Sulfate' for 'Eclampsia'. The nurse notes a respiratory rate of 8 bpm and absent patellar reflexes. What is the priority?",
+            a: "Increase the infusion rate to stop seizures.",
+            b: "Stop the infusion and administer Calcium Gluconate IV.",
+            c: "Notify the doctor to order a chest X-ray.",
+            d: "Encourage the patient to breathe faster.",
+            k: "B",
+            str: "STR: Increasing the rate (A) to prevent more seizures.",
+            scfhs: "SCFHS: (B) 'Safe Action'. These are classic signs of magnesium toxicity. Calcium Gluconate is the specific antagonist for magnesium.",
+        },
+        {
+            id: 104,
+            v: "A patient in the ED has been bitten by a 'Snake'. What is the most appropriate initial nursing action?",
+            a: "Apply a tight tourniquet above the bite site.",
+            b: "Immobilize the affected limb and keep it below the heart level.",
+            c: "Suck the venom out of the wound using a kit.",
+            d: "Apply ice packs to the site to reduce swelling.",
+            k: "B",
+            str: "STR: Applying a tight tourniquet (A) to stop the venom spread.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Tourniquets (A) and ice (D) can worsen tissue necrosis. Immobilization and keeping the limb low slows lymphatic spread of venom.",
+        },
+        {
+            id: 105,
+            v: "A patient with 'Acute Respiratory Failure' has a PaO2/FiO2 ratio (P/F ratio) of 150. How should the nurse interpret this according to the Berlin Criteria?",
+            a: "Normal lung function.",
+            b: "Moderate ARDS.",
+            c: "Mild ARDS.",
+            d: "Severe ARDS.",
+            k: "B",
+            str: "STR: Mild ARDS (C) since the ratio is above 100.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Mild ARDS is 201-300, Moderate is 101-200, and Severe is ≤100.",
+        },
+        {
+            id: 106,
+            v: "During 'Active Resuscitation' (CPR), the nurse notes the End-Tidal CO2 (EtCO2) suddenly jumps from 15 mmHg to 40 mmHg. What does this indicate?",
+            a: "The patient is hyperventilating.",
+            b: "Return of Spontaneous Circulation (ROSC).",
+            c: "The CPR quality has decreased.",
+            d: "The ventilator is malfunctioning.",
+            k: "B",
+            str: "STR: The patient is hyperventilating (A) due to the air build-up.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A sudden, sustained increase in EtCO2 is a highly reliable indicator that the heart has started beating on its own.",
+        },
+        {
+            id: 107,
+            v: "A patient is admitted with 'Myasthenic Crisis'. What is the primary concern for the nurse?",
+            a: "Inability to walk.",
+            b: "Respiratory failure due to muscle weakness.",
+            c: "Skin breakdown.",
+            d: "Increased appetite.",
+            k: "B",
+            str: "STR: Inability to walk (A) due to muscle exhaustion.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Myasthenic crisis affects the muscles of respiration and swallowing, making airway management and ventilation the top priority.",
+        },
+        {
+            id: 108,
+            v: "A patient with 'Thoracic Trauma' has 'Tracheal Deviation' to the left side and absent breath sounds on the right. What is the immediate intervention?",
+            a: "Perform an ECG.",
+            b: "Needle decompression (thoracostomy) on the right side.",
+            c: "Wait for a chest X-ray to confirm the diagnosis.",
+            d: "Intubate the patient.",
+            k: "B",
+            str: "STR: Waiting for X-ray (C) to ensure the correct side is treated.",
+            scfhs: "SCFHS: (B) 'Safe Action'. These are signs of a Tension Pneumothorax. It is a clinical diagnosis; waiting for an X-ray (C) can lead to cardiac arrest.",
+        },
+        {
+            id: 109,
+            v: "A patient in the ICU is on 'Fentanyl' and 'Midazolam' for sedation. The nurse notes the patient is easily arousable and follows commands. What is the RASS score?",
+            a: "-5 (Unarousable).",
+            b: "0 (Alert and Calm).",
+            c: " -1 (Drowsy).",
+            d: "+2 (Agitated).",
+            k: "C",
+            str: "STR: 0 (B) because they are following commands.",
+            scfhs: "SCFHS: (C) 'Safe Action'. A score of -1 (Drowsy) means the patient is not fully alert but has sustained awakening to voice (follows commands).",
+        },
+        {
+            id: 110,
+            v: "A patient with 'Hypothermia' (Core temp 28°C) is in 'Ventricular Fibrillation'. What is the ACLS modification for this patient?",
+            a: "Shock the patient repeatedly until the rhythm changes.",
+            b: "Deliver one shock and then focus on rewarming before further shocks or meds.",
+            c: "Administer double doses of Epinephrine.",
+            d: "Do not perform CPR until the patient is warm.",
+            k: "B",
+            str: "STR: Shock repeatedly (A) to force the heart to start.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A cold heart is often resistant to defibrillation and medications. Rewarming is essential for successful resuscitation.",
+        },
+        {
+            id: 111,
+            v: "A patient is receiving 'Vasoactive Infusions' through a peripheral IV. The nurse notes 'Extravasation' (swelling and blanching at the site). What is the first action?",
+            a: "Apply a cold compress immediately.",
+            b: "Stop the infusion immediately.",
+            c: "Increase the rate to flush the drug into the tissue.",
+            d: "Remove the IV catheter right away.",
+            k: "B",
+            str: "STR: Removing the IV (D) to stop the irritation.",
+            scfhs: "SCFHS: (B) 'Safe Action'. You must stop the infusion (B) first. In some cases, you leave the catheter in to administer an antidote (like Phentolamine) before removal.",
+        },
+        {
+            id: 112,
+            v: "A patient is admitted with 'Adrenal Crisis' (Addisonian Crisis). Which electrolyte pattern is expected?",
+            a: "Hypernatremia and Hypokalemia.",
+            b: "Hyponatremia and Hyperkalemia.",
+            c: "Hypercalcemia and Hyperglycemia.",
+            d: "Hypomagnesemia.",
+            k: "B",
+            str: "STR: Hypernatremia (A) due to salt retention.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Lack of aldosterone leads to salt wasting (low sodium) and potassium retention (high potassium).",
+        },
+        {
+            id: 113,
+            v: "What is the primary indicator for 'Continuous Renal Replacement Therapy' (CRRT) over standard Hemodialysis?",
+            a: "The patient is too stable for dialysis.",
+            b: "Hemodynamic instability (Hypotension).",
+            c: "The patient has a high fever.",
+            d: "Lack of a dialysis nurse.",
+            k: "B",
+            str: "STR: High fever (C) which CRRT can cool down.",
+            scfhs: "SCFHS: (B) 'Safe Action'. CRRT is slower and gentler, making it ideal for critically ill patients who cannot tolerate the rapid fluid shifts of standard hemodialysis.",
+        },
+        {
+            id: 114,
+            v: "A patient with 'Ischemic Stroke' has a blood pressure of 190/100 mmHg. The patient is NOT a candidate for fibrinolytic therapy. What is the goal for BP management?",
+            a: "Aggressively lower BP to 120/80 mmHg immediately.",
+            b: "Maintain the BP below 220/120 mmHg unless other end-organ damage occurs.",
+            c: "Keep the BP as high as possible to ensure perfusion.",
+            d: "Give the patient a dose of Furosemide.",
+            k: "B",
+            str: "STR: Lowering BP to 120/80 (A) to prevent a brain bleed.",
+            scfhs: "SCFHS: (B) 'Safe Action'. In non-tPA candidates, 'permissive hypertension' is allowed to maintain collateral circulation to the ischemic penumbra.",
+        },
+        {
+            id: 115,
+            v: "A patient with 'Malignant Hyperthermia' during surgery should be treated with which medication?",
+            a: "Atropine.",
+            b: "Dantrolene Sodium.",
+            c: "Succinylcholine.",
+            d: "Halothane.",
+            k: "B",
+            str: "STR: Succinylcholine (C) as it is a muscle relaxant.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Dantrolene is the only specific antidote that stops the calcium release causing the muscle rigidity and extreme heat.",
+        },
+        {
+            id: 116,
+            v: "In 'Post-Cardiac Arrest Care', what is the target temperature for 'Targeted Temperature Management' (TTM)?",
+            a: "37°C.",
+            b: "32°C to 36°C.",
+            c: "30°C to 32°C.",
+            d: "25°C.",
+            k: "B",
+            str: "STR: 30°C (C) to maximize brain protection.",
+            scfhs: "SCFHS: (B) 'Safe Action'. TTM between 32-36°C for at least 24 hours is recommended to improve neurological outcomes after ROSC.",
+        },
+        {
+            id: 117,
+            v: "A patient on the ventilator is 'Fighting the Ventilator' (Asynchrony). What is the first nursing assessment?",
+            a: "Check the sedation level.",
+            b: "Assess for hypoxia, pain, or a kinked tube.",
+            c: "Administer a neuromuscular blocker (paralytic).",
+            d: "Turn off the ventilator to see if they can breathe.",
+            k: "B",
+            str: "STR: Administering a paralytic (C) to stop the movement.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Always check the patient and the equipment for physical causes (hypoxia/pain) before adding more sedation or paralysis.",
+        },
+        {
+            id: 118,
+            v: "A patient with 'Acute Liver Failure' develops 'Asterixis'. How is this assessed?",
+            a: "Asking the patient to follow a light with their eyes.",
+            b: "Asking the patient to extend their arms and dorsiflex their wrists.",
+            c: "Checking the patient's deep tendon reflexes.",
+            d: "Testing the patient's gait.",
+            k: "B",
+            str: "STR: Checking reflexes (C) with a hammer.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Asterixis (liver flap) is a hallmark of hepatic encephalopathy, characterized by a flapping tremor of the hands.",
+        },
+        {
+            id: 119,
+            v: "Which finding in a patient with a 'Chest Tube' indicates that the lung has fully re-expanded?",
+            a: "Continuous bubbling in the water seal chamber.",
+            b: "Absence of tidaling in the water seal chamber and clear breath sounds.",
+            c: "The drainage has stopped completely in the first hour.",
+            d: "The patient is coughing more frequently.",
+            k: "B",
+            str: "STR: Continuous bubbling (A) as it shows the air is out.",
+            scfhs: "SCFHS: (B) 'Safe Action'. Tidaling stops when the lung is fully expanded or if there is a kink in the tube. (A) indicates a leak.",
+        },
+        {
+            id: 120,
+            v: "A patient is in the ICU and has a 'Do Not Resuscitate' (DNR) order. The patient's heart stops. What is the nurse's action?",
+            a: "Start CPR anyway because the family is watching.",
+            b: "Withhold CPR and provide comfort care/support to the family.",
+            c: "Call a 'Code Blue' to be safe.",
+            d: "Give a dose of Epinephrine but do not perform chest compressions.",
+            k: "B",
+            str: "STR: Calling Code Blue (C) so the doctor can confirm the DNR.",
+            scfhs: "SCFHS: (B) 'Safe Action'. A DNR order must be respected. The nurse focuses on a dignified death and support for the family.",
+        }
+      // TERUSKAN SAMPAI 100 DENGAN FORMAT YANG SAMA
+   ];
+
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let timerInterval;
+    let secondsElapsed = 0;
+    let selectedOption = null;
+
+    function startExam() {
+        const nameInput = document.getElementById('candidate-name').value;
+        if (!nameInput) return alert("Please enter your name");
+        
+        document.getElementById('display-name').innerText = "Nurse: " + nameInput;
+        document.getElementById('welcome-screen').classList.remove('active');
+        document.getElementById('exam-screen').classList.add('active');
+        
+        startTimer();
+        loadQuestion();
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            secondsElapsed++;
+            let mins = Math.floor(secondsElapsed / 60);
+            let secs = secondsElapsed % 60;
+            document.getElementById('timer-text').innerText = 
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    function loadQuestion() {
+        const q = rawQuestions[currentQuestionIndex];
+        selectedOption = null;
+        
+        document.getElementById('progress-text').innerText = `Q ${currentQuestionIndex + 1}/${rawQuestions.length}`;
+        document.getElementById('vignette').innerText = q.v;
+        document.getElementById('rationale-area').style.display = 'none';
+        document.getElementById('next-btn').disabled = true;
+        document.getElementById('rat-btn').disabled = true;
+
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+
+        const letters = ['A', 'B', 'C', 'D'];
+        const choiceTexts = [q.a, q.b, q.c, q.d];
+
+        choiceTexts.forEach((text, index) => {
+            const button = document.createElement('button');
+            button.className = 'opt';
+            button.innerText = `${letters[index]}. ${text}`;
+            button.onclick = () => selectChoice(button, letters[index]);
+            optionsDiv.appendChild(button);
+        });
+    }
+
+    function selectChoice(element, letter) {
+        const allOpts = document.querySelectorAll('.opt');
+        allOpts.forEach(opt => opt.classList.remove('selected'));
+        element.classList.add('selected');
+        
+        selectedOption = letter;
+        document.getElementById('next-btn').disabled = false;
+        document.getElementById('rat-btn').disabled = false;
+    }
+
+    function showRationale() {
+        const q = rawQuestions[currentQuestionIndex];
+        const area = document.getElementById('rationale-area');
+        
+        area.innerHTML = `
+            <p><strong>Correct Answer: ${q.k}</strong></p>
+            <p><strong>Strategy:</strong> ${q.str}</p>
+            <p><strong>Rationale:</strong> ${q.scfhs}</p>
+        `;
+        area.style.display = 'block';
+    }
+
+    function nextQuestion() {
+        if (selectedOption === rawQuestions[currentQuestionIndex].k) {
+            score++;
+        }
+
+        currentQuestionIndex++;
+
+        if (currentQuestionIndex < rawQuestions.length) {
+            loadQuestion();
+        } else {
+            finishExam();
+        }
+    }
+
+    function finishExam() {
+        clearInterval(timerInterval);
+        document.getElementById('exam-screen').classList.remove('active');
+        document.getElementById('result-screen').classList.add('active');
+        
+        const percent = Math.round((score / rawQuestions.length) * 100);
+        document.getElementById('score-display').innerText = percent + "%";
+        
+        const feedback = percent >= 70 ? "Excellent! You are ready for the SCFHS Exam." : "Keep practicing. Focus on Safety Protocols.";
+        document.getElementById('feedback-text').innerText = feedback;
+    }
+</script>
+</body>
+</html>
+  
+      
